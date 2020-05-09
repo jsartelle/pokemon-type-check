@@ -1,11 +1,20 @@
 # pokemon-type-check
 
-An app for quickly looking up information about a Pokemon, written in [Vue.js](https://vuejs.org/) using [Vuetify](https://vuetifyjs.com/en/).
+An app for quickly looking up information about a Pokémon, written in [Vue.js](https://vuejs.org/) using [Vuetify](https://vuetifyjs.com/en/).
 
 ## Features
-- Search for Pokemon by name with autocomplete
-- Quickly see type effectiveness and base stats
-- Kind of nice looking Material UI
+- Search for Pokémon by name with autocomplete
+- Includes all Pokémon through Gen VIII (Sword & Shield) with alternate forms
+- Quickly see type, type effectiveness, and base stats
+- Material UI with automatic light/dark theme switching (based on your system theme)
+
+![Screenshot of app using light theme](screenshot-light.png)
+![Screenshot of app using dark theme](screenshot-dark.png)
+
+## Issues
+- Alternate forms are listed by Japanese name.
+- A bit broken on mobile right now - base stats disappear when dismissing the keyboard in Chrome, and the info panel doesn't show at all in Firefox.
+
 
 ## Project setup
 ```
