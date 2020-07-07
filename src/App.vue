@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-content>
+    <v-main>
       <v-container class="fill-height">
         <v-row
           align="center"
@@ -19,6 +19,7 @@
                   menu-props="closeOnContentClick"
                   return-object
                   autofocus
+                  clearable
                   hide-no-data
                   hide-details
                   flat
@@ -41,7 +42,7 @@
                     <v-chip-group column>
                       <v-chip
                         class="type-chip white--text elevation-3"
-                        :color="typeColors[type]"
+                        :color="types[type].color"
                         v-for="type in selectedPokemon.type"
                         :key="type"
                       >{{type}}</v-chip>
@@ -79,8 +80,8 @@
                         >
                           <v-chip
                             class="type-chip white--text mx-2 elevation-3"
-                            :color="typeColors[type]"
-                            v-for="([type, value]) in getEffectiveTypes(check)"
+                            :color="types[type].color"
+                            v-for="([type, value]) in typesForEffectivenessGroup(check)"
                             :key="type"
                           >
                             <v-avatar
@@ -106,6 +107,7 @@
                           </tr>
                         </thead>
                         <tbody>
+                          <!-- TODO: highlight strong/weak stats -->
                           <tr
                             v-for="(value, name) in selectedPokemon.stats"
                             :key="name"
@@ -119,18 +121,64 @@
                   </v-col>
                 </v-row>
               </v-card-text>
+
+              <v-card-text v-else>
+                <v-row class="px-5">
+                  <v-col>
+                    <v-simple-table
+                      class="effectiveness-table"
+                      dense
+                    >
+                      <template #default>
+                        <thead>
+                          <tr>
+                            <td class="legend-cell sticky-cell pa-0">
+                              <span>ATK</span>
+                              <span>DEF</span>
+                            </td>
+                            <th
+                              v-for="type in Object.keys(types)"
+                              :key="type"
+                              scope="col"
+                              class="text-center white--text"
+                              :style="{ backgroundColor: types[type].color }"
+                            >{{type | abbreviateType}}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            v-for="attackingType in Object.keys(types)"
+                            :key="attackingType"
+                          >
+                            <th
+                              scope="row"
+                              class="sticky-cell text-center white--text"
+                              :style="{ backgroundColor: types[attackingType].color }"
+                            >{{attackingType | abbreviateType}}</th>
+                            <td
+                              v-for="defendingType in Object.keys(types)"
+                              :key="defendingType"
+                              class="text-center"
+                              :class="effectivenessCellClass(types[attackingType].effectiveness[defendingType])"
+                            >{{types[attackingType].effectiveness[defendingType] | fractionize | hide1x}}</td>
+                          </tr>
+                        </tbody>
+                      </template>
+                    </v-simple-table>
+                  </v-col>
+                </v-row>
+              </v-card-text>
             </v-card>
           </v-col>
         </v-row>
       </v-container>
-    </v-content>
+    </v-main>
   </v-app>
 </template>
 
 <script>
 import pokemon from "@/data/pokemon.json";
 import types from "@/data/types.json";
-import typeColors from "@/data/typeColors.json";
 
 const effectivenessGroups = [
   {
@@ -157,48 +205,52 @@ export default {
   data() {
     return {
       pokemon,
-      typeColors,
+      types,
       effectivenessGroups,
       selectedPokemon: null
     };
   },
   computed: {
-    toolbarColor() {
-      if (!this.selectedPokemon) return "primary";
-      return this.typeColors[this.selectedPokemon.type[0]];
-    },
-    typeEffectiveness() {
+    currentTypeEffectiveness() {
       if (!this.selectedPokemon) return null;
 
-      return this.selectedPokemon.type.reduce((acc, defendingType) => {
-        Object.entries(types).forEach(([attackingType, modifiers]) => {
-          Object.entries(modifiers).forEach(
-            ([modifierString, modifiedTypes]) => {
-              if (modifiedTypes.includes(defendingType)) {
-                if (!acc[attackingType]) {
-                  acc[attackingType] = parseFloat(modifierString);
-                } else {
-                  acc[attackingType] *= parseFloat(modifierString);
-                }
-              }
-            }
-          );
+      const effectiveness = {};
+
+      Object.keys(this.types).forEach(attackingType => {
+        effectiveness[attackingType] = 1;
+
+        this.selectedPokemon.type.forEach(defendingType => {
+          effectiveness[attackingType] *= this.types[
+            attackingType
+          ].effectiveness[defendingType];
         });
-        return acc;
-      }, {});
+      });
+
+      return effectiveness;
+    },
+    toolbarColor() {
+      if (!this.selectedPokemon) return "primary";
+      return this.types[this.selectedPokemon.type[0]].color;
     }
   },
   methods: {
-    getEffectiveTypes(check) {
-      return Object.entries(this.typeEffectiveness)
+    effectivenessCellClass(effectiveness) {
+      switch (effectiveness) {
+        case 0:
+          return ["bordered-cell"];
+        case 0.5:
+          return ["red", "darken-2", "white--text"];
+        case 2:
+          return ["green", "darken-2", "white--text"];
+      }
+    },
+    typesForEffectivenessGroup(check) {
+      return Object.entries(this.currentTypeEffectiveness)
         .filter(([, value]) => check(value))
         .sort(([, aValue], [, bValue]) => bValue - aValue);
     }
   },
   filters: {
-    padNo(value) {
-      return String(value).padStart(3, "0");
-    },
     fractionize(value) {
       switch (value) {
         case 0.5:
@@ -208,6 +260,15 @@ export default {
         default:
           return value;
       }
+    },
+    hide1x(value) {
+      return value == 1 ? "" : value;
+    },
+    padNo(value) {
+      return String(value).padStart(3, "0");
+    },
+    abbreviateType(value) {
+      return value.slice(0, 3).toUpperCase();
     },
     statName(stat) {
       switch (stat) {
@@ -244,5 +305,56 @@ export default {
 
 .type-chip .effectiveness {
   background-color: rgba(0, 0, 0, 0.4);
+}
+
+.effectiveness-table th {
+  text-shadow: 0 0 5px black;
+}
+
+.effectiveness-table .sticky-cell {
+  position: sticky;
+  left: 0;
+}
+
+.effectiveness-table .legend-cell {
+  background-color: white;
+  background-image: linear-gradient(
+    to top right,
+    transparent,
+    transparent calc(50% - 1px),
+    currentColor 50%,
+    transparent calc(50% + 1px),
+    transparent
+  );
+}
+
+.theme--dark .effectiveness-table .legend-cell {
+  background-color: #1e1e1e;
+}
+
+.effectiveness-table .legend-cell span {
+  position: absolute;
+  font-size: 0.75em;
+  line-height: 1;
+}
+
+.effectiveness-table .legend-cell span:nth-child(1) {
+  bottom: 3px;
+  left: 3px;
+}
+
+.effectiveness-table .legend-cell span:nth-child(2) {
+  top: 3px;
+  right: 3px;
+}
+
+.effectiveness-table .bordered-cell {
+  border: 2px dashed currentColor !important;
+}
+</style>
+
+<style>
+.effectiveness-table table {
+  border-collapse: collapse;
 }
 </style>
