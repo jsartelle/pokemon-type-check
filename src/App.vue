@@ -107,13 +107,15 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <!-- TODO: highlight strong/weak stats -->
                           <tr
                             v-for="(value, name) in selectedPokemon.stats"
                             :key="name"
                           >
                             <td>{{name | statName}}</td>
-                            <td class="font-weight-medium">{{value}}</td>
+                            <td
+                              class="font-weight-medium"
+                              :class="statClass(name)"
+                            >{{value}}</td>
                           </tr>
                         </tbody>
                       </template>
@@ -243,6 +245,44 @@ export default {
         case 2:
           return ["green", "darken-2", "white--text"];
       }
+    },
+    statClass(statName) {
+      const comparisonStat = (() => {
+        switch (statName) {
+          case "attack":
+            return "spAttack";
+          case "spAttack":
+            return "attack";
+          case "defense":
+            return "spDefense";
+          case "spDefense":
+            return "defense";
+        }
+      })();
+      if (!comparisonStat) return [];
+
+      let colorClass = (() => {
+        switch (
+          Math.sign(
+            this.selectedPokemon.stats[statName] -
+              this.selectedPokemon.stats[comparisonStat]
+          )
+        ) {
+          case 1:
+            return "blue--text";
+          case -1:
+            return "red--text";
+          case 0:
+          case -0:
+            return;
+        }
+      })();
+      if (!colorClass) return [];
+
+      return [
+        colorClass,
+        this.$vuetify.theme.dark ? undefined : "text--darken-2"
+      ];
     },
     typesForEffectivenessGroup(check) {
       return Object.entries(this.currentTypeEffectiveness)
